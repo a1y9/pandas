@@ -15,6 +15,12 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -24,13 +30,28 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-          openjdk-17-jdk \
-          gradle \
           build-essential \
           libssl-dev \
           libffi-dev \
           python3-dev \
-          cargo
+          unzip \
+          wget \
+          curl \
+          git
+
+    - name: Install Flutter
+      run: |
+        wget https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.19.6-stable.tar.xz
+        tar xf flutter_linux_3.19.6-stable.tar.xz
+        echo "$GITHUB_WORKSPACE/flutter/bin" >> $GITHUB_PATH
+        echo "$GITHUB_WORKSPACE/flutter/.pub-cache/bin" >> $GITHUB_PATH
+    
+    - name: Flutter doctor and configure Android SDK
+      run: |
+        flutter channel stable
+        flutter upgrade
+        flutter doctor -v
+        yes | flutter doctor --android-licenses
     
     - name: Install Python dependencies
       run: |
@@ -40,17 +61,21 @@ jobs:
         pip install numpy==2.1.1
         pip install pyinstaller
     
-    - name: Install Flet packaging dependencies
+    - name: Install Flet CLI and packaging dependencies
       run: |
         pip install flet-core
         pip install setuptools
     
-    - name: Check Python version
-      run: python --version
+    - name: Check versions
+      run: |
+        python --version
+        flutter --version
+        dart --version
     
     - name: Build Android APK
       run: |
-        # Replace 'main.py' with your main application file
+        # Ensure you're in the correct directory with your main.py
+        # Replace 'main.py' with your actual main application file
         flet build apk
     
     - name: Upload APK artifact
@@ -60,3 +85,18 @@ jobs:
         path: dist/*.apk
         retention-days: 5
 
+# Optional: Uncomment and modify if you want to create a release
+#   create-release:
+#     needs: build-android
+#     runs-on: ubuntu-latest
+#     steps:
+#     - name: Download APK
+#       uses: actions/download-artifact@v4
+#       with:
+#         name: android-apk
+    
+#     - name: Create GitHub Release
+#       uses: softprops/action-gh-release@v2
+#       if: startsWith(github.ref, 'refs/tags/')
+#       with:
+#         files: '*.apk'
